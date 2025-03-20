@@ -166,3 +166,5 @@ datasets/ready_to_work/*
 datasets/in_process_of_labeling/*
 !datasets/raw_data/test_data_15_2608.csv
 !datasets/raw_data/test_data_15_958_with_real_sold_prices.csv
+!datasets/in_process_of_labeling/test_data_15_958_with_real_sold_prices.csv
+!datasets/ready_to_work/test_data_15_958_with_real_sold_prices.csv
