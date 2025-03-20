@@ -6,7 +6,7 @@ This is an open-source tool for labeling prices in time series data. You can lab
 
 Here’s a short demo of how the tool works:
 
-![Demo](docs/images/time_series_labeling_demo.gif)
+![Demo](docs/images/time_series_labeling_demo_faster.gif)
 
 *P.S. I've used this code in the labeling of tens of thousands of time series. Now in prod I am using a newer version (plotly.js + fastapiб which is more flexible faster and has a lot of cool tools), maybe I will find time and a way to put this version into open source as well.*
 
