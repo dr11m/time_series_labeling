@@ -5,10 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [2.0.0] - 2025-08-22
 
 ### Added
-- **Universal Data Format**: Introduced standardized JSON format for time series data
+- **Automatic Configuration Loader**: `cfg_loader.py` automatically creates `cfg.py` from `cfg.example.py` if missing
+- **Universal Data Format**: Complete migration to JSON format with Pydantic models (TimeSeriesDataset, TimeSeries, TimeSeriesPoint)
   - Support for time series of any length (no longer limited to 15 points)
-  - Flexible metadata structure for additional information
-  - Support for multiple labeled values per series
+  - Flexible metadata structure and multiple labeled values per series
   - Backward compatibility with existing labeled data
 
 - **Advanced Data Filtering System**: Comprehensive filtering capabilities for data preprocessing
@@ -39,12 +39,13 @@ All notable changes to this project will be documented in this file.
 - **Data Format Migration**: Moved from CSV-based format to universal JSON format
 - **Application Architecture**: Updated to support flexible data sources and formats
 - **Filtering Logic**: Enhanced filtering system with multiple criteria and visual feedback
+- **Configuration Management**: Automated configuration setup and validation
 
 ### Technical Improvements
 - **Performance**: Optimized data processing for large datasets
 - **Flexibility**: Modular design allowing easy addition of new filtering criteria
-- **User Experience**: Better error handling and progress reporting
-- **Maintainability**: Cleaner code structure with comprehensive documentation
+- **User Experience**: Better error handling, progress reporting, and automatic setup
+- **Maintainability**: Cleaner code structure with comprehensive documentation and type safety
 
 ## [1.0.0] - 2025-04-24
 
