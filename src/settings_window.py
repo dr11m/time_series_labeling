@@ -1,13 +1,14 @@
 import os
 import tkinter as tk
 from tkinter import ttk
-import cfg.cfg as cfg
+from cfg.cfg_loader import cfg
+
 
 def open_settings_window():
     def on_start():
         """Save selected settings and close the window."""
         cfg.NORMALIZE_VIEW = bool(normalize_var.get())
-        cfg.CSV_DESCRIPTION = csv_desc.get("1.0", tk.END).strip()
+        cfg.CSV_DESCRIPTION = json_desc.get("1.0", tk.END).strip()  # Используем для JSON description
         selected = int(num_prices_var.get())
         cfg.NUM_PRICES = cfg.LabeledPriceAmount.ONE if selected == 1 else cfg.LabeledPriceAmount.TWO
         cfg.DATA_FILE = os.path.join("datasets", folder_var.get(), file_var.get())
@@ -47,13 +48,13 @@ def open_settings_window():
     normalize_chk = tk.Checkbutton(settings_win, text="Display normalized view", variable=normalize_var, font=font_label)
     normalize_chk.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="w")
 
-    # CSV description
-    csv_desc_label = tk.Label(settings_win, text="CSV Description (first line in CSV):", font=font_label)
-    csv_desc_label.grid(row=2, column=0, columnspan=2, padx=10, pady=(10, 0), sticky="w")
+    # JSON description
+    json_desc_label = tk.Label(settings_win, text="JSON Description (dataset description):", font=font_label)
+    json_desc_label.grid(row=2, column=0, columnspan=2, padx=10, pady=(10, 0), sticky="w")
 
-    csv_desc = tk.Text(settings_win, height=3, width=55, font=font_main)
-    csv_desc.insert(tk.END, cfg.CSV_DESCRIPTION)
-    csv_desc.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
+    json_desc = tk.Text(settings_win, height=3, width=55, font=font_main)
+    json_desc.insert(tk.END, cfg.CSV_DESCRIPTION)  # Используем существующую переменную
+    json_desc.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
 
     # Number of prices dropdown
     num_prices_label = tk.Label(settings_win, text="Number of prices to label:", font=font_label)
@@ -67,13 +68,13 @@ def open_settings_window():
     folder_label = tk.Label(settings_win, text="Select dataset folder:", font=font_label)
     folder_label.grid(row=6, column=0, columnspan=2, padx=10, pady=(10, 0), sticky="w")
 
-    folder_options = ["in_process_of_labeling", "raw_data", "ready_to_work"]
+    folder_options = ["in_process_of_labeling", "raw_data", "ready_to_work", "converted_json"]
     folder_var = tk.StringVar(value=folder_options[1])
     folder_menu = ttk.Combobox(settings_win, textvariable=folder_var, values=folder_options, state="readonly", width=25)
     folder_menu.grid(row=7, column=0, columnspan=2, padx=10, pady=5)
 
-    # CSV file selection dropdown
-    file_label = tk.Label(settings_win, text="Select CSV file:", font=font_label)
+    # JSON file selection dropdown
+    file_label = tk.Label(settings_win, text="Select JSON file:", font=font_label)
     file_label.grid(row=8, column=0, columnspan=2, padx=10, pady=(10, 0), sticky="w")
 
     file_var = tk.StringVar()
@@ -85,7 +86,7 @@ def open_settings_window():
         folder = folder_var.get()
         path = os.path.join("datasets", folder)
         try:
-            files = [f for f in os.listdir(path) if f.endswith(".csv")]
+            files = [f for f in os.listdir(path) if f.endswith(".json")]
         except FileNotFoundError:
             files = []
         file_menu["values"] = files

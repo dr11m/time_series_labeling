@@ -13,6 +13,11 @@ CSV_DESCRIPTION = "This CSV contains labeled price time series data."
 # Количество цен для разметки (используем enum)
 NUM_PRICES = LabeledPriceAmount.TWO
 
+# Настройки длины временных рядов
+TARGET_SERIES_LENGTH = 10  # Желаемая длина временного ряда
+SKIP_SHORTER_SERIES = True  # Пропускать ряды короче TARGET_SERIES_LENGTH
+TAKE_LAST_N_VALUES = True  # Брать последние N значений если ряд длиннее TARGET_SERIES_LENGTH
+
 # Plot and app settings
 TITLE_TEMPLATE = "Index: {idx} - {name}"
 INSTRUCTIONS = (
