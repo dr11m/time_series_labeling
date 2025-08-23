@@ -13,7 +13,7 @@ from src.data_formats import TimeSeriesDataset, TimeSeries, JSONAdapter, create_
 import os
 
 warnings.filterwarnings("ignore", category=FutureWarning)
-
+current_timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
 
 class UniversalMainApp:
     def __init__(self, dataset: TimeSeriesDataset):
@@ -46,18 +46,61 @@ class UniversalMainApp:
         # Нормализуем для отображения если нужно
         display_values = app_utils.normalize_array(values) if cfg.NORMALIZE_VIEW else values
         
-        # Создаем временные метки для оси X
-        x_points = list(range(1, len(values) + 1))
+        # Подготавливаем оси X в зависимости от настроек
+        if cfg.SHOW_TIMESTAMPS_AS_DATES and timestamps:
+            # Показываем timestamps как даты
+            try:
+                x_points = []
+                for ts in timestamps:
+                    if isinstance(ts, (int, float)):
+                        dt = datetime.datetime.fromtimestamp(ts)
+                    else:
+                        dt = pd.to_datetime(ts).to_pydatetime()
+                    x_points.append(dt)
+                x_label = "Date"
+            except:
+                # Если не удалось конвертировать, используем числа
+                x_points = list(range(1, len(values) + 1))
+                x_label = "Time Point"
+        else:
+            # Показываем как числа
+            x_points = list(range(1, len(values) + 1))
+            x_label = "Time Point"
 
         plt.clf()
         plt.plot(x_points, display_values, marker='o')
         plt.scatter(x_points, display_values, color='green')
         
+        # Отображаем размеченные значения если они есть
+        if series.labeled_values:
+            for label_name, label_value in series.labeled_values.items():
+                if cfg.NORMALIZE_VIEW:
+                    # Нормализуем размеченное значение для отображения
+                    display_label_value = app_utils.normalize_array([label_value])[0]
+                else:
+                    display_label_value = label_value
+                
+                # Рисуем горизонтальную линию для размеченного значения
+                plt.axhline(y=display_label_value, color='orange', linestyle='--', alpha=0.8, 
+                           label=f'Labeled {label_name}: {label_value:.3f}')
+            
+            # Добавляем легенду для размеченных значений
+            plt.legend()
+        
+        # Добавляем текущую дату если включено
+        if cfg.SHOW_CURRENT_DATE:
+            current_time = datetime.datetime.now()
+            if isinstance(x_points[0], datetime.datetime):
+                # Если показываем даты, добавляем текущую дату
+                plt.axvline(x=current_time, color='red', linestyle='--', alpha=0.7, label='Current Date')
+                if not series.labeled_values:  # Добавляем легенду только если нет размеченных значений
+                    plt.legend()
+        
         if self.first_click_y is not None:
             plt.axhline(y=self.first_click_y, color='orange', linestyle='--')
 
         cursor = Cursor(plt.gca(), useblit=True, color='red', linewidth=1)
-        plt.xlabel("Time Point")
+        plt.xlabel(x_label)
         plt.ylabel("Value")
         
         # Показываем информацию о ряде
@@ -68,6 +111,12 @@ class UniversalMainApp:
         )
         plt.title(title)
         plt.grid(True)
+        
+        # Автоматическое форматирование меток оси X для дат
+        if isinstance(x_points[0], datetime.datetime):
+            plt.gca().xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%Y-%m-%d'))
+            plt.gca().xaxis.set_major_locator(plt.matplotlib.dates.AutoDateLocator())
+        
         plt.show()
 
     def handle_key_press(self, event):
@@ -115,7 +164,6 @@ class UniversalMainApp:
 
     def save_data(self):
         """Сохранить данные в JSON формате"""
-        current_timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
         
         # Сохраняем в JSON
         json_path = f"{cfg.OUTPUT_DIR}/universal_labeling_{current_timestamp}.json"
@@ -157,17 +205,50 @@ class UniversalMainApp:
         for i, (series, distance) in enumerate(similar_series):
             ax = axes[i // 2, i % 2]
             values = series.get_values()
+            timestamps = series.get_timestamps()
+            
+            # Подготавливаем оси X в зависимости от настроек
+            if cfg.SHOW_TIMESTAMPS_AS_DATES and timestamps:
+                try:
+                    x_points = []
+                    for ts in timestamps:
+                        if isinstance(ts, (int, float)):
+                            dt = datetime.datetime.fromtimestamp(ts)
+                        else:
+                            dt = pd.to_datetime(ts).to_pydatetime()
+                        x_points.append(dt)
+                except:
+                    x_points = list(range(1, len(values) + 1))
+            else:
+                x_points = list(range(1, len(values) + 1))
             
             if cfg.NORMALIZE_VIEW:
                 values_norm = app_utils.normalize_array(values)
-                ax.plot(range(1, len(values) + 1), values_norm)
-                if series.labeled_values and 'price_1' in series.labeled_values:
-                    predicted = app_utils.normalize_array([series.labeled_values['price_1']])[0]
-                    ax.axhline(y=predicted, color='green', linestyle='--')
+                ax.plot(x_points, values_norm)
             else:
-                ax.plot(range(1, len(values) + 1), values)
-                if series.labeled_values and 'price_1' in series.labeled_values:
-                    ax.axhline(y=series.labeled_values['price_1'], color='green', linestyle='--')
+                ax.plot(x_points, values)
+            
+            # Отображаем все размеченные значения
+            if series.labeled_values:
+                for label_name, label_value in series.labeled_values.items():
+                    if cfg.NORMALIZE_VIEW:
+                        display_label_value = app_utils.normalize_array([label_value])[0]
+                    else:
+                        display_label_value = label_value
+                    
+                    ax.axhline(y=display_label_value, color='blue', linestyle='--', alpha=0.8,
+                               label=f'{label_name}: {label_value:.3f}')
+                
+                # Добавляем легенду для размеченных значений
+                ax.legend(fontsize=8)
+            
+            # Добавляем текущую дату если включено
+            if cfg.SHOW_CURRENT_DATE and isinstance(x_points[0], datetime.datetime):
+                current_time = datetime.datetime.now()
+                ax.axvline(x=current_time, color='red', linestyle='--', alpha=0.7)
+                # Автоматическое форматирование меток оси X для дат
+                ax.xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%Y-%m-%d'))
+                ax.xaxis.set_major_locator(plt.matplotlib.dates.AutoDateLocator())
                     
             ax.set_title(f"Similar {i+1} (D: {distance:.2f})")
             ax.grid(True)

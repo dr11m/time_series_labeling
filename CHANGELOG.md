@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2025-08-23
+
+### Added
+- **Enhanced Display Settings**: New configuration options for improved visualization
+  - `SHOW_TIMESTAMPS_AS_DATES`: Display timestamps as readable dates instead of numbers
+  - `SHOW_CURRENT_DATE`: Add current date as virtual point on plots for real-time reference
+  - Automatic date formatting with matplotlib's DateFormatter and AutoDateLocator
+- **Labeled Values Visualization**: Display existing labeled values on plots
+  - Horizontal lines showing labeled prices with values in legend
+  - Works in both main plot and similar patterns subplots
+  - Automatic normalization support for labeled values
+- **Improved Settings Window**: Enhanced configuration interface
+  - New "Display Settings" section with checkboxes for date and current date options
+  - Better organized layout with clear section headers
+  - Increased window size to accommodate new settings
+
+### Changed
+- **Plot Visualization**: Enhanced matplotlib integration
+  - Automatic date axis formatting when timestamps are displayed as dates
+  - Better legend management for multiple labeled values
+  - Improved color scheme: orange for labeled values, red for current date
+- **User Experience**: More intuitive interface
+  - Clear visual feedback for labeled values
+  - Better date representation for time series analysis
+  - Enhanced settings organization
+
+### Technical Improvements
+- **Code Structure**: Cleaner implementation of display options
+- **Configuration Management**: Direct access to mandatory settings without getattr fallbacks
+- **Documentation**: Updated README with new configuration options
+
 ## [2.0.0] - 2025-08-22
 
 ### Added
