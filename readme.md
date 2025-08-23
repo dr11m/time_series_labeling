@@ -1,32 +1,17 @@
 # Time Series Labeling Tool
 
-Универсальный инструмент для разметки временных рядов с интерактивной визуализацией.
+A universal tool for labeling time series with interactive visualization.
 
-## 🚀 New Features
+## Table of Contents
 
-### Universal Data Format
-- **Variable Length Support** - no longer limited to 15 points per series
-- **JSON Format** - standardized data format for all time series
-- **Easy Integration** - users convert their data to JSON format
-- **Length-based Filtering** - work only with series of desired length
-
-### Advanced Data Filtering System
-- **Duplicate Removal** - automatic removal of duplicate timestamps
-- **Sale Time Analysis** - sophisticated filtering based on sales interval statistics
-  - Trimmed mean analysis with current date integration
-  - Coefficient of variation (CV) filtering for stability
-  - Range ratio analysis for distribution uniformity
-  - Gap ratio detection for clustering identification
-  - Outlier ratio analysis for data quality
-- **Visual Analysis Tools** - detailed visualization of rejected series with borderline case analysis
-- **Configurable Parameters** - comprehensive filtering settings with detailed documentation
-
-### Database Integration
-- **`database/` folder** - for your database integration code
-- **Data Adapters** - universal interface for different data sources
-- **Implementation Examples** - ready-to-use templates for integration
-
-This is an open-source tool for labeling prices in time series data. You can label one or two prices for each time series. Additionally, you can navigate through the charts (by press arrows ← →) and find similar time series using dynamic time warping (DTW) by pressing the 'd' key when you're unsure about labeling a particular chart.
+- [Demo](#demo)
+- [Instructions](#instructions)
+- [Installation and Launch](#installation-and-launch)
+- [Usage](#usage)
+- [Data Preparation](#data-preparation)
+- [Data Format](#data-format)
+- [Contributing](#contributing)
+- [TODO](#todo)
 
 ## Demo
 
@@ -111,10 +96,9 @@ You can install the necessary dependencies in two ways:
 3. Once you've finished labeling, the labeled data will be saved in the `datasets/in_process_of_labeling` folder.
 
 
-### Data Preparation
+## 📊 Data Preparation
 Convert your data to JSON format according to the specification below.
 
-## 📊 Data Format
 
 ### Pydantic Model
 *just check*
@@ -189,22 +173,22 @@ from src.data_formats import DataAdapter, TimeSeriesDataset
           
       def save_data(self, dataset: TimeSeriesDataset, destination: str) -> None:
           # Your database data saving logic
-  ```
+```
 
-  ### 2. Use in Application
-  ```python
-  from database.database_adapter import DatabaseAdapter
-  from database.config import DB_CONFIG
+### 2. Use in Application
+```python
+from database.database_adapter import DatabaseAdapter
+from database.config import DB_CONFIG
 
-  # Load data from database
-  adapter = DatabaseAdapter(DB_CONFIG)
-  dataset = adapter.load_data(query_params={'start_date': '2024-01-01'})
-  ```
+# Load data from database
+adapter = DatabaseAdapter(DB_CONFIG)
+dataset = adapter.load_data(query_params={'start_date': '2024-01-01'})
+```
 
 
-  ## Contributing
+## Contributing
 
-  Feel free to fork the repository, open issues, and submit pull requests. Contributions are welcome!
+Feel free to fork the repository, open issues, and submit pull requests. Contributions are welcome!
 
 
 
