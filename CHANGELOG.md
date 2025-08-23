@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   - Flexible metadata structure and multiple labeled values per series
   - Backward compatibility with existing labeled data
 
-- **Advanced Data Filtering System** : (`examples/filtering_data_example.ipynb`) Comprehensive filtering capabilities for data preprocessing
+- **Advanced Data Filtering System** : `examples/filtering_data_example.ipynb` - Comprehensive filtering capabilities for data preprocessing
   - **Duplicate Removal**: Automatic removal of duplicate timestamps within series
   - **Length-based Filtering**: Filter series by minimum/maximum length requirements
   - **Sale Time Analysis**: Sophisticated filtering based on sales interval statistics
