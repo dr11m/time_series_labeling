@@ -6,6 +6,7 @@ from scipy.spatial.distance import euclidean
 import cfg.cfg as cfg
 from src.models import SaleRow
 from pydantic import ValidationError
+from typing import List
 
 
 def validate_df(df):
@@ -80,3 +81,8 @@ def find_and_plot_distances(self):
     
     plt.tight_layout()
     plt.show(block=False)  # don't block the main thread
+
+
+def calculate_dtw_distance(series1: list[float], series2: List[float]) -> float:
+    """Вычислить DTW расстояние между двумя временными рядами"""
+    return fastdtw(series1, series2, dist=lambda x, y: abs(x - y))[0]

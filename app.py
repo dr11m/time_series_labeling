@@ -8,15 +8,16 @@ import warnings
 from src.settings_window import open_settings_window
 from src.controls_window import start_control_window
 import src.app_utils as app_utils
-import cfg.cfg as cfg
-
+from cfg.cfg_loader import cfg
+from src.data_formats import TimeSeriesDataset, TimeSeries, JSONAdapter, create_sample_dataset
+import os
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-class MainApp:
-    def __init__(self, df):
-        self.df = df
+class UniversalMainApp:
+    def __init__(self, dataset: TimeSeriesDataset):
+        self.dataset = dataset
         self.idx = 0
         self.click_stage = 1
         self.first_click_y = None
@@ -26,34 +27,48 @@ class MainApp:
         self.__post_init__()
 
     def __post_init__(self):
-        # init columns if there are none
-        for col in ['labeled_price_1', 'labeled_price_2']:
-            if col not in self.df.columns:
-                self.df[col] = -1
-
-        while self.idx < len(df) and self.df.iloc[self.idx]['labeled_price_1'] != -1:
+        # Обрабатываем временные ряды согласно настройкам длины
+        self.process_series_lengths()
+        
+        # Находим первый неразмеченный ряд
+        while self.idx < len(self.dataset) and self.dataset.series[self.idx].is_labeled():
             self.idx += 1
 
     def show_data(self):
-        if self.idx >= len(self.df):
+        if self.idx >= len(self.dataset):
+            print("Все ряды размечены!")
             return
-        row = self.df.iloc[self.idx]
-        prices = [row[f'price_{i}'] for i in range(1, 11)]
-        display_prices = app_utils.normalize_array(prices) if cfg.NORMALIZE_VIEW else prices
+            
+        series = self.dataset.series[self.idx]
+        values = series.get_values()
+        timestamps = series.get_timestamps()
+        
+        # Нормализуем для отображения если нужно
+        display_values = app_utils.normalize_array(values) if cfg.NORMALIZE_VIEW else values
+        
+        # Создаем временные метки для оси X
+        x_points = list(range(1, len(values) + 1))
 
         plt.clf()
-        plt.plot(range(1, 11), display_prices, marker='o')
-        plt.scatter(range(1, 11), display_prices, color='green')
+        plt.plot(x_points, display_values, marker='o')
+        plt.scatter(x_points, display_values, color='green')
+        
         if self.first_click_y is not None:
             plt.axhline(y=self.first_click_y, color='orange', linestyle='--')
 
         cursor = Cursor(plt.gca(), useblit=True, color='red', linewidth=1)
-        plt.xlabel("Time")
-        plt.ylabel("Price")
-        plt.title(cfg.TITLE_TEMPLATE.format(idx=self.idx, name=row.get('name', 'Unknown')))
+        plt.xlabel("Time Point")
+        plt.ylabel("Value")
+        
+        # Показываем информацию о ряде
+        title = cfg.TITLE_TEMPLATE.format(
+            idx=self.idx, 
+            name=series.name or series.id,
+            length=series.length()
+        )
+        plt.title(title)
         plt.grid(True)
         plt.show()
-
 
     def handle_key_press(self, event):
         if event.key == "right":
@@ -62,62 +77,218 @@ class MainApp:
             self.go_backward()
         elif event.key == "d":
             self.find_and_plot_distances()
+        elif event.key == "f":
+            self.filter_by_length()
 
     def handle_mouse_click(self, event):
         x, y = event.xdata, event.ydata
         if x is None or y is None:
             return
 
-        row = self.df.iloc[self.idx]
-        prices = [row[f'price_{i}'] for i in range(1, 11)]
-        y_original = app_utils.denormalize_value(y, prices) if cfg.NORMALIZE_VIEW else y
+        series = self.dataset.series[self.idx]
+        values = series.get_values()
+        y_original = app_utils.denormalize_value(y, values) if cfg.NORMALIZE_VIEW else y
 
         if cfg.NUM_PRICES.value == 1:
-            self.df.at[self.idx, 'labeled_price_1'] = round(y_original, 3)
+            # Размечаем одну цену
+            if series.labeled_values is None:
+                series.labeled_values = {}
+            series.labeled_values['price_1'] = round(y_original, 3)
             self.idx += 1
         else:
+            # Размечаем две цены
+            if series.labeled_values is None:
+                series.labeled_values = {}
+                
             if self.click_stage == 1:
-                self.df.at[self.idx, 'labeled_price_1'] = round(y_original, 3)
+                series.labeled_values['price_1'] = round(y_original, 3)
                 self.first_click_y = y
                 self.click_stage = 2
             else:
-                self.df.at[self.idx, 'labeled_price_2'] = round(y_original, 3)
+                series.labeled_values['price_2'] = round(y_original, 3)
                 self.click_stage = 1
                 self.first_click_y = None
                 self.idx += 1
 
-        self.save_csv_with_a_description()
+        self.save_data()
         self.show_data()
 
-
-    def save_csv_with_a_description(self):
-        description = "# " + cfg.CSV_DESCRIPTION + "\n"
+    def save_data(self):
+        """Сохранить данные в JSON формате"""
         current_timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
-        output_csv_path = f"{cfg.OUTPUT_DIR}/labeling_in_progress_{current_timestamp}.csv"
-        with open(output_csv_path, 'w', encoding='utf-8', newline='') as f:
-            f.write(description)
-            self.df.to_csv(f, index=False)
-        print("Data saved!")
+        
+        # Сохраняем в JSON
+        json_path = f"{cfg.OUTPUT_DIR}/universal_labeling_{current_timestamp}.json"
+        json_adapter = JSONAdapter()
+        json_adapter.save_data(self.dataset, json_path)
+        
+        print(f"Data saved to {json_path}")
 
     def find_and_plot_distances(self):
-        app_utils.find_and_plot_distances(self)
+        """Найти похожие паттерны"""
+        if self.idx >= len(self.dataset):
+            return
+            
+        current_series = self.dataset.series[self.idx]
+        current_values = current_series.get_values()
+        
+        # Получаем размеченные ряды
+        labeled_series = self.dataset.get_labeled_series()
+        if len(labeled_series) < 2:
+            print("Недостаточно размеченных данных!")
+            return
+            
+        # Находим похожие ряды
+        similar_series = []
+        for labeled_ts in labeled_series:
+            labeled_values = labeled_ts.get_values()
+            distance = app_utils.calculate_dtw_distance(current_values, labeled_values)
+            similar_series.append((labeled_ts, distance))
+        
+        # Сортируем по расстоянию
+        similar_series.sort(key=lambda x: x[1])
+        similar_series = similar_series[:4]  # Берем 4 самых похожих
+        
+        # Показываем графики
+        fig = plt.figure(num="Similar Patterns", figsize=(12, 6))
+        fig.suptitle(f"Similar patterns for series {current_series.name}", fontsize=12)
+        axes = fig.subplots(2, 2)
+        
+        for i, (series, distance) in enumerate(similar_series):
+            ax = axes[i // 2, i % 2]
+            values = series.get_values()
+            
+            if cfg.NORMALIZE_VIEW:
+                values_norm = app_utils.normalize_array(values)
+                ax.plot(range(1, len(values) + 1), values_norm)
+                if series.labeled_values and 'price_1' in series.labeled_values:
+                    predicted = app_utils.normalize_array([series.labeled_values['price_1']])[0]
+                    ax.axhline(y=predicted, color='green', linestyle='--')
+            else:
+                ax.plot(range(1, len(values) + 1), values)
+                if series.labeled_values and 'price_1' in series.labeled_values:
+                    ax.axhline(y=series.labeled_values['price_1'], color='green', linestyle='--')
+                    
+            ax.set_title(f"Similar {i+1} (D: {distance:.2f})")
+            ax.grid(True)
+        
+        plt.tight_layout()
+        plt.show(block=False)
+
+    def filter_by_length(self):
+        """Фильтровать ряды по длине"""
+        print("\nФильтрация по длине:")
+        print("1. Минимальная длина")
+        print("2. Максимальная длина") 
+        print("3. Диапазон длин")
+        print("4. Применить настройки из конфига")
+        
+        try:
+            choice = input("Выберите опцию (1-4): ").strip()
+            
+            if choice == "1":
+                min_len = int(input("Введите минимальную длину: "))
+                self.dataset = self.dataset.filter_by_length(min_length=min_len)
+                print(f"Осталось рядов: {len(self.dataset)}")
+                
+            elif choice == "2":
+                max_len = int(input("Введите максимальную длину: "))
+                self.dataset = self.dataset.filter_by_length(max_length=max_len)
+                print(f"Осталось рядов: {len(self.dataset)}")
+                
+            elif choice == "3":
+                min_len = int(input("Введите минимальную длину: "))
+                max_len = int(input("Введите максимальную длину: "))
+                self.dataset = self.dataset.filter_by_length(min_length=min_len, max_length=max_len)
+                print(f"Осталось рядов: {len(self.dataset)}")
+                
+            elif choice == "4":
+                # Применяем настройки из конфига
+                self.process_series_lengths()
+                print(f"Применены настройки из конфига. Осталось рядов: {len(self.dataset)}")
+                
+            # Сбрасываем индекс
+            self.idx = 0
+            self.__post_init__()
+            
+        except (ValueError, KeyboardInterrupt):
+            print("Отменено")
 
     def go_forward(self):
-        app_utils.go_forward(self)
+        if self.idx < len(self.dataset) - 1:
+            self.idx += 1
+            self.click_stage = 1
+            self.show_data()
+            print("Moved forward.")
+
+    def process_series_lengths(self):
+        """Обработать временные ряды согласно настройкам длины"""
+        if not hasattr(cfg, 'TARGET_SERIES_LENGTH'):
+            return
+            
+        target_length = cfg.TARGET_SERIES_LENGTH
+        skip_shorter = getattr(cfg, 'SKIP_SHORTER_SERIES', True)
+        take_last_n = getattr(cfg, 'TAKE_LAST_N_VALUES', True)
+        
+        processed_series = []
+        skipped_count = 0
+        truncated_count = 0
+        
+        for series in self.dataset.series:
+            current_length = series.length()
+            
+            # Пропускаем короткие ряды
+            if skip_shorter and current_length < target_length:
+                skipped_count += 1
+                continue
+            
+            # Если ряд длиннее целевой длины, берем последние N значений
+            if take_last_n and current_length > target_length:
+                series.points = series.points[-target_length:]
+                truncated_count += 1
+            
+            processed_series.append(series)
+        
+        # Обновляем dataset
+        self.dataset.series = processed_series
+        
+        print(f"Обработка временных рядов завершена:")
+        print(f"  - Целевая длина: {target_length}")
+        print(f"  - Пропущено коротких рядов: {skipped_count}")
+        print(f"  - Обрезано длинных рядов: {truncated_count}")
+        print(f"  - Осталось рядов: {len(processed_series)}")
 
     def go_backward(self):
-        app_utils.go_backward(self)
+        if self.idx > 0:
+            self.idx -= 1
+            self.click_stage = 1
+            self.show_data()
+            print("Moved backward.")
+
+
+def load_data_from_source(source_path: str) -> TimeSeriesDataset:
+    """Загрузить данные из JSON файла"""
+    if not source_path.endswith('.json'):
+        raise ValueError(f"Only JSON format is supported: {source_path}")
+    
+    adapter = JSONAdapter()
+    return adapter.load_data(source_path)
 
 
 if __name__ == "__main__":
     open_settings_window()
 
-    df = pd.read_csv(cfg.DATA_FILE, comment="#")
-    app_utils.validate_df(df)
+    # Загружаем данные
+    if hasattr(cfg, 'DATA_FILE') and os.path.exists(cfg.DATA_FILE):
+        dataset = load_data_from_source(cfg.DATA_FILE)
+    else:
+        # Создаем демонстрационные данные
+        dataset = create_sample_dataset()
 
-    main_app = MainApp(df)
+    print(f"Loaded {len(dataset)} time series")
+    print(f"Unlabeled: {len(dataset.get_unlabeled_series())}")
+    print(f"Labeled: {len(dataset.get_labeled_series())}")
 
+    main_app = UniversalMainApp(dataset)
     start_control_window(main_app)
-
     main_app.show_data()
-
