@@ -7,7 +7,6 @@ A universal tool for labeling time series with interactive visualization.
 - [Demo](#demo)
 - [Instructions](#instructions)
 - [Installation and Launch](#installation-and-launch)
-- [Usage](#usage)
 - [Data Preparation](#data-preparation)
 - [Data Format](#data-format)
 - [Contributing](#contributing)
@@ -35,7 +34,7 @@ After launching you will go to a simple settings menu, after that you can start 
 
 *The labeled data will be saved in the `datasets/in_process_of_labeling` folder.*
 
-## 🛠 Installation and Launch
+## Installation and Launch
 
 You can install the necessary dependencies in two ways:
 
@@ -83,7 +82,6 @@ You can install the necessary dependencies in two ways:
    python app.py
    ```
 
-## Usage
 
 1. Run the application with:
 
@@ -96,7 +94,7 @@ You can install the necessary dependencies in two ways:
 3. Once you've finished labeling, the labeled data will be saved in the `datasets/in_process_of_labeling` folder.
 
 
-## 📊 Data Preparation
+## Data Preparation
 Convert your data to JSON format according to the specification below.
 
 
