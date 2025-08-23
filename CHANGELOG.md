@@ -33,6 +33,25 @@ All notable changes to this project will be documented in this file.
 - **Configuration Management**: Direct access to mandatory settings without getattr fallbacks
 - **Documentation**: Updated README with new configuration options
 
+### Bug Fixes
+- Fixed syntax error in settings window (duplicate font parameter)
+- Improved error handling for timestamp conversion
+
+### Changed
+- **Plot Visualization**: Enhanced matplotlib integration
+  - Automatic date axis formatting when timestamps are displayed as dates
+  - Better legend management for multiple labeled values
+  - Improved color scheme: orange for labeled values, red for current date
+- **User Experience**: More intuitive interface
+  - Clear visual feedback for labeled values
+  - Better date representation for time series analysis
+  - Enhanced settings organization
+
+### Technical Improvements
+- **Code Structure**: Cleaner implementation of display options
+- **Configuration Management**: Direct access to mandatory settings without getattr fallbacks
+- **Documentation**: Updated README with new configuration options
+
 ## [2.0.0] - 2025-08-22
 
 ### Added
