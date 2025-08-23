@@ -8,6 +8,7 @@ A universal tool for labeling time series with interactive visualization.
 - [Instructions](#instructions)
 - [Installation and Launch](#installation-and-launch)
 - [Data Preparation](#data-preparation)
+- [Configuration](#configuration)
 - [Data Format](#data-format)
 - [Contributing](#contributing)
 - [TODO](#todo)
@@ -97,6 +98,14 @@ You can install the necessary dependencies in two ways:
 ## Data Preparation
 Convert your data to JSON format according to the specification below.
 
+### Configuration
+The application uses `cfg/cfg.py` for settings. Key options:
+- `NORMALIZE_VIEW`: Set to `True` for normalized display (0-1 scale) or `False` for raw prices
+- `SHOW_TIMESTAMPS_AS_DATES`: Set to `True` to show timestamps as readable dates, `False` for numbers
+- `SHOW_CURRENT_DATE`: Set to `True` to add current date as virtual point on plot, `False` to hide it
+- `NUM_PRICES`: Number of prices to label (1 or 2)
+- `DATA_FILE`: Path to your JSON dataset file
+- `OUTPUT_DIR`: Directory for saving labeled data
 
 ### Pydantic Model
 *just check*
