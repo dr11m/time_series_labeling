@@ -1,218 +1,221 @@
 # Time Series Labeling Tool
 
-A universal tool for labeling time series with interactive visualization.
+A universal, extensible tool for labeling time series with interactive visualization and intelligent similarity search.
 
-## Table of Contents
+<p align="center">
+  <img src="docs/images/anomaly_mode.png" width="30%" alt="Anomaly Detection Mode" />
+    <img src="docs/images/classification_mode.png" width="30%" alt="Classification Mode" />
+  <img src="docs/images/prediction_mode.png" width="30%" alt="Prediction Mode" />
+</p>
 
-- [Demo](#demo)
-- [Instructions](#instructions)
-- [Installation and Launch](#installation-and-launch)
-- [Data Preparation](#data-preparation)
-- [Configuration](#configuration)
-- [Data Format](#data-format)
-- [Contributing](#contributing)
-- [TODO](#todo)
+<p align="center">
+  &nbsp; <b>Detect</b> anomalies|&nbsp; <b>Classify</b> patterns &nbsp;|<b>Predict</b> future values &nbsp;
+</p>
 
 ## Demo
 
-Here’s a short demo of how the tool works:
-
-![Demo](docs/images/time_series_labeling_demo_faster.gif)
+![Demo](docs/images/time_series_labeling_demo.gif)
 
 
-*P.S. I've used this code in the labeling of tens of thousands of time series. Now in production I am using a newer version (plotly.js + fastapi, which is more flexible, faster and has a lot of cool tools), maybe I will find time and a way to put this version into open source as well.*
+## Quick Start
 
-## Instructions
+1.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-After launching you will go to a simple settings menu, after that you can start labeling!
+2.  **Run the application:**
+    ```bash
+    python app.py
+    ```
 
-- If labeling 1 price, click in the desired place on the plot (the price you want to set) as `labeled_price_1`.
-- If labeling 2 prices, click once for `labeled_price_1` and click again for `labeled_price_2`.
-*see `Number of prices to label` in the settings menu at launch*
-- Press 'd' to find similar time series using DTW (Euclidean distance).
-- Use the backward and forward arrows (← →) to move between the plots
-- Press 'f' to filter time series by length (new universal app only)
+3.  **Start Labeling:**
+    -   Load your data (dataset folder with generated examples, load each numpy file).
+    -   Select your mode (Predict, Classify, or Anomaly) in the settings tab.
+    -   Use keyboard shortcuts `←/→` to navigate between examples, `D` to find similar examples, `S` to save to speed up your workflow.
 
-*The labeled data will be saved in the `datasets/in_process_of_labeling` folder.*
+### 📂 Data Files
+To start, ensure your dataset folder contains:
+-   ✅ **`prices.npy`** (Required)
+-   ✅ **`timestamps.npy`** (Required)
+-   ❔ `ids.npy` (Optional)
+-   ❔ `cluster_ids.npy` (Optional - pre-generated cluster labels to assist labeling)
+-   ❔ `predicted_prices_to_help.npy` (Optional - predictions from trained models to assist labeling)
+-   ❔ `metadata.json` (Optional)
 
-## Installation and Launch
+> 💡 **Tip:** You can use the `datasets/example_data` folder to test the tool immediately.
 
-You can install the necessary dependencies in two ways:
+> 💡 **Tip:** If a `metadata.json` file exists, load it first to restore all previous settings!
 
-### Option 1: Using `pipenv`
-
-1. Install `pipenv` if you don't have it already:
-
-   ```bash
-   pip install pipenv
-   ```
-
-2. Install dependencies from the `Pipfile`:
-
-   ```bash
-   pipenv install
-   ```
-
-3. To activate the virtual environment, run:
-
-   ```bash
-   pipenv shell
-   ```
-
-4. Run the application:
-
-   ```bash
-   python app.py
-   ```
-   or
-   ```bash
-   pipenv run python app.py
-   ```
-
-### Option 2: Using `pip` and `requirements.txt`
-
-1. Install dependencies using `pip`:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Run the application:
-
-   ```bash
-   python app.py
-   ```
+---
 
 
-1. Run the application with:
+## Features
 
-   ```bash
-   python app.py
-   ```
+**Three Labeling Modes**
+-   **Predict Mode**: Label future price values (1 or 2 prices)
+-   **Classify Mode**: Categorize time series into N classes
+-   **Anomaly Detection Mode**: Mark anomaly points in time series
 
-2. The application will open a window where you can label the prices of time series.
+**Intelligent Similarity Search**
+-   Find similar labeled series using Soft-DTW algorithm
+-   Helpful for consistent labeling decisions
+-   Visual comparison of query vs similar series
 
-3. Once you've finished labeling, the labeled data will be saved in the `datasets/in_process_of_labeling` folder.
+**Interactive UI**
+-   Modern tabbed settings window
+-   Real-time visualization with matplotlib
+-   Keyboard shortcuts for efficient labeling
 
+**Flexible Visualization**
+-   Configurable padding and margins
+-   Highlighting of specific data points
+-   Zoom and region selection
+-   Automatic timestamp formatting
 
-## Data Preparation
-Convert your data to JSON format according to the specification below.
+**Persistent Settings**
+-   Settings saved automatically in `settings.json`
+-   Resume labeling sessions with same configuration
+-   Per-dataset descriptions
+
+---
+
+## Detailed Documentation
+
+### Installation and Launch
+
+#### Option 1: Using `pipenv`
+
+```bash
+# Install pipenv if needed
+pip install pipenv
+
+# Install dependencies
+pipenv install
+
+# Activate environment
+pipenv shell
+
+# Run application
+python app.py
+```
+
+#### Option 2: Using `pip` and `requirements.txt`
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run application
+python app.py
+```
+
+### Architecture
+
+The tool uses a modular, extensible architecture:
+
+```
+src/
+├── dataset_loader.py        # NumPy dataset loading
+├── labeling_types/          # Labeling implementations
+│   ├── base.py             # Abstract base class
+│   ├── predict.py          # Price prediction labeling
+│   ├── classify.py         # Classification labeling
+│   └── anomaly_detection.py # Anomaly detection labeling
+│
+├── similarity/              # Similarity search algorithms
+│   ├── base.py             # Abstract similarity interface
+│   └── soft_dtw.py         # Soft-DTW implementation
+│
+├── settings/                # Settings management
+│   ├── settings_manager.py # JSON persistence
+│   ├── settings_window.py  # Tabbed UI
+│   └── last_metadata_path.py # Last used metadata tracking
+│
+└── ui/                      # UI components (reserved for future use)
+```
+
+### Labeling Types Details
+
+#### Predict Mode
+Label future price values for time series forecasting tasks.
+-   **Controls**: Click on plot to set price, `D` for similarity, `←/→` to navigate.
+-   **Settings**: `num_prices` (1-3).
+
+#### Classify Mode
+Categorize time series into predefined classes.
+-   **Controls**: `1-N` to assign class, `S` for similarity.
+-   **Settings**: `num_classes` (2-10).
+
+#### Anomaly Detection Mode
+Mark anomaly points in time series.
+-   **Controls**: Click points to mark/unmark.
 
 ### Configuration
-The application uses `cfg/cfg.py` for settings. Key options:
-- `NORMALIZE_VIEW`: Set to `True` for normalized display (0-1 scale) or `False` for raw prices
-- `SHOW_TIMESTAMPS_AS_DATES`: Set to `True` to show timestamps as readable dates, `False` for numbers
-- `SHOW_CURRENT_DATE`: Set to `True` to add current date as virtual point on plot, `False` to hide it
-- `NUM_PRICES`: Number of prices to label (1 or 2)
-- `DATA_FILE`: Path to your JSON dataset file
-- `OUTPUT_DIR`: Directory for saving labeled data
 
-### Pydantic Model
-*just check*
-```python
-from src.data_formats import DataAdapter, TimeSeriesDataset
-```
+Settings are stored in `settings.json`.
 
-### JSON Format (Only Supported Format)
-```json
-{
-  "name": "Dataset Name",
-  "description": "Dataset description",
-  "series": [
-    {
-      "id": "series_1",
-      "name": "Time Series 1",
-      "points": [
-        {"timestamp": 1731535200, "value": 1.73},
-        {"timestamp": 1737842400, "value": 1.75}
-      ],
-      "metadata": {
-        "buy_price": 1.5,
-        "sell_price": 1.88
-      },
-      "labeled_values": {
-        "price_1": 1.85,
-        "price_2": 1.92
-      }
-    }
-  ]
-}
-```
+**Key Options:**
+-   **Visualization**: `right_padding`, `y_padding_percent`.
+-   **Similarity**: `method` (soft_dtw), `gamma` (softness).
 
-### Format Specification
+### Data Format
 
-#### TimeSeriesDataset (root object)
-- `name` (string, required) - dataset name
-- `description` (string, optional) - dataset description
-- `series` (array, required) - array of time series
-- `metadata` (object, optional) - dataset metadata
-- `created_at` (datetime, optional) - creation date
+The tool uses NumPy arrays (`.npy`) stored in a single folder.
 
-#### TimeSeries (time series)
-- `id` (string, required) - unique series identifier
-- `name` (string, optional) - series name/description
-- `points` (array, required) - array of time series points
-- `metadata` (object, optional) - series metadata
-- `labeled_values` (object, optional) - labeled values
+#### 📄 File Descriptions
 
-#### TimeSeriesPoint (time series point)
-- `timestamp` (number/string, required) - timestamp (Unix timestamp or datetime string)
-- `value` (number, required) - value at this point
-- `metadata` (object, optional) - additional point data
+-   **`prices.npy`** (Required)
+    -   **Content**: The actual time series data (e.g., stock prices, sensor readings).
+    -   **Shape**: `(N, seq_len)` where `N` is the number of samples and `seq_len` is the length of each series.
+    -   **Type**: Float.
 
-#### labeled_values (labeled values)
-- `price_1` (number, optional) - first labeled price
-- `price_2` (number, optional) - second labeled price
-- You can add any other keys for additional labels
+-   **`timestamps.npy`** (Required)
+    -   **Content**: Time values corresponding to the data points.
+    -   **Shape**:
+        -   `(N, seq_len)`: Unique timestamps for each sample.
+        -   `(N,)` or `(seq_len,)`: Shared timestamps for all samples.
+    -   **Type**: Float or Int (Unix timestamps recommended).
+
+-   **`ids.npy`** (Optional)
+    -   **Content**: Unique string or integer identifiers for each time series sample.
+    -   **Shape**: `(N,)`.
+    -   **Usage**: displayed in the UI to help identify specific samples.
+
+-   **`cluster_ids.npy`** (Optional)
+    -   **Content**: Pre-generated cluster labels to assist with consistent labeling decisions.
+    -   **Shape**: `(N,)`.
+    -   **Usage**: Displayed in the UI to help identify and group similar patterns, assisting with consistent labeling decisions.
+
+-   **`predicted_prices_to_help.npy`** (Optional)
+    -   **Content**: Pre-computed predictions from trained ML models to assist with labeling.
+    -   **Shape**: `(N,)` or `(N, num_predictions)`.
+    -   **Usage**: Displayed in the UI as reference points to speed up manual labeling.
+
+-   **`labels.npy`** (Auto-generated)
+    -   **Content**: The labels you create.
+    -   **Shape**: Depends on labeling mode (e.g., `(N, num_prices)` for Predict, `(N,)` for Classify).
+    -   **Usage**: Automatically saved and loaded to persist your work.
+
+-   **`metadata.json`** (Optional)
+    -   **Content**: JSON file containing dataset description and default settings.
+    -   **Usage**: Auto-configures the tool when loading the dataset.
 
 
-### 1. Implement Adapter
-```python
-# database/database_adapter.py
-  from src.data_formats import DataAdapter, TimeSeriesDataset
 
-  class DatabaseAdapter(DataAdapter):
-      def __init__(self, config):
-          # Your database connection initialization
-          
-      def load_data(self, source=None, query_params=None) -> TimeSeriesDataset:
-          # Your database data loading logic
-          
-      def save_data(self, dataset: TimeSeriesDataset, destination: str) -> None:
-          # Your database data saving logic
-```
+### Extending the Tool
 
-### 2. Use in Application
-```python
-from database.database_adapter import DatabaseAdapter
-from database.config import DB_CONFIG
-
-# Load data from database
-adapter = DatabaseAdapter(DB_CONFIG)
-dataset = adapter.load_data(query_params={'start_date': '2024-01-01'})
-```
-
+-   **New Labeling Type**: Inherit from `BaseLabelingType` in `src/labeling_types/`.
+-   **New Similarity Method**: Inherit from `BaseSimilarityFinder` in `src/similarity/`.
 
 ## Contributing
 
-Feel free to fork the repository, open issues, and submit pull requests. Contributions are welcome!
+Feel free to fork the repository, open issues, and submit pull requests.
 
+## License
 
+Copyright (c) 2023-2025 [dr11m]. All rights reserved.
 
-  ## TODO:
+---
 
-  - [x] Change the input data format so that it is possible to label time series of any length (by specifying the desired size in the settings).
-  - [x] Add comprehensive data filtering system with multiple criteria
-  - [x] Add duplicate removal and sale time analysis capabilities
-  - [x] Add visual analysis tools for rejected series
-  - [ ] Add support for more data formats (Parquet, HDF5)
-  - [ ] Add batch processing capabilities
-  - [ ] Add export to different formats
-
-  **Authors**
-
-  * [dr11m](https://github.com/dr11m)
-
-  **Copyright**
-
-  Copyright (c) 2023 [dr11m]. All rights reserved.
+*P.S. This tool has been used in the labeling of tens of thousands of time series for production ML models.*

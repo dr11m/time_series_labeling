@@ -2,6 +2,84 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2025-11-29
+
+### Added
+- **NumPy Data Format**: Complete migration to NumPy-based data format for improved performance and compatibility
+  - Support for loading datasets from individual `.npy` files (prices, timestamps, ids, cluster_ids, labels)
+  - Flexible metadata support via JSON files
+  - Automatic detection and loading of label files with multiple naming conventions
+- **Anomaly Detection Mode**: New labeling type for detecting anomalies in time series
+  - Click-based anomaly point marking
+  - Per-point labeling (0 = normal, 1 = anomaly)
+  - Index-based auto-backup system
+  - Resume functionality from last processed index
+- **Enhanced Settings Window**: Improved configuration interface
+  - Tabbed interface with organized sections (General, Labeling Settings, Similarity Search)
+  - Real-time dataset information display
+  - Metadata JSON editor with validation
+  - Automatic settings loading from dataset metadata
+- **Improved Similarity Search**: Enhanced Soft-DTW implementation
+  - Processed data API for consistent similarity calculations
+  - Visual comparison with labeled values display
+  - Support for all labeling types (predict, classify, anomaly detection)
+- **Advanced Visualization Features**:
+  - Right padding visualization for future price prediction
+  - Highlighting of last N points
+  - Zoom region selection with rectangle selector
+  - Predicted prices visualization (magenta markers)
+  - Y-axis padding configuration
+- **Export Functionality**: 
+  - X/y data export for classification mode
+  - Separate export for labeled and unlabeled data
+  - Metadata snapshot with settings and statistics
+
+### Changed
+- **Data Format Migration**: Moved from JSON-based format to NumPy arrays for better performance
+  - Individual `.npy` files for each data component
+  - Backward compatibility maintained through automatic file detection
+- **Application Architecture**: Complete refactoring with modular design
+  - Separated labeling types into individual modules (`predict.py`, `classify.py`, `anomaly_detection.py`)
+  - Base class architecture for extensibility
+  - Plugin-based similarity search system
+  - Settings management with JSON persistence
+- **Labeling Workflow**: Improved user experience
+  - Automatic navigation to first unlabeled sample
+  - Periodic auto-backups (every 15 labels for predict/classify, every 10 indices for anomaly detection)
+  - Backup file naming with dataset prefix
+  - Progress tracking and resume functionality
+- **Settings Management**: Enhanced configuration system
+  - Settings saved to both `settings.json` and dataset `metadata.json`
+  - Automatic restoration of settings from dataset metadata
+  - Last metadata path tracking
+
+### Technical Improvements
+- **Code Structure**: Modular architecture with clear separation of concerns
+  - `src/dataset_loader.py` - NumPy dataset loading
+  - `src/labeling_types/` - Labeling implementations
+  - `src/similarity/` - Similarity search algorithms
+  - `src/settings/` - Settings management
+- **Performance**: Optimized data loading and processing
+  - Direct NumPy array operations
+  - Efficient similarity search with processed data API
+- **Error Handling**: Improved error messages and validation
+  - File existence checks
+  - Data shape validation
+  - Clear error messages for common issues
+- **Type Safety**: Added type hints throughout the codebase
+- **Dependencies**: Cleaned up unused dependencies (removed seaborn, plotly, dash, ujson)
+
+### Breaking Changes
+- **Data Format**: NumPy format is now the primary data format
+  - Old JSON format is no longer directly supported
+  - Migration required: convert JSON datasets to NumPy format
+- **Settings Structure**: Settings format has changed
+  - New file-based configuration system
+  - Settings stored per-dataset in metadata.json
+- **API Changes**: Internal APIs have been refactored
+  - Similarity finder now uses processed data API
+  - Labeling types use base class architecture
+
 ## [2.1.0] - 2025-08-23
 
 ### Added

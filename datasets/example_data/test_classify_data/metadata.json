@@ -1,0 +1,36 @@
+{
+  "description": "Test dataset for Classify mode - time series classification",
+  "created_at": "2025-11-30T15:25:31.543872",
+  "num_samples": 10,
+  "sequence_length": 20,
+  "labeling_type": "classify",
+  "labeling_settings": {
+    "labeling_type": "classify",
+    "predict": {
+      "num_prices": 2
+    },
+    "classify": {
+      "num_classes": 5
+    },
+    "anomaly_detection": {},
+    "labeling": {
+      "right_padding": 0,
+      "y_padding_percent": 15,
+      "num_points_from_end": 0
+    },
+    "similarity": {
+      "method": "soft_dtw",
+      "num_similar": 4,
+      "gamma": 0.05
+    },
+    "data": {
+      "prices_file": "C:/Users/dr1m/Desktop/github/time_series_labeling/datasets/example_data/test_classify_data/prices.npy",
+      "timestamps_file": "C:/Users/dr1m/Desktop/github/time_series_labeling/datasets/example_data/test_classify_data/timestamps.npy",
+      "ids_file": "C:/Users/dr1m/Desktop/github/time_series_labeling/datasets/example_data/test_classify_data/ids.npy",
+      "cluster_ids_file": "",
+      "labels_file": "",
+      "metadata_file": "C:/Users/dr1m/Desktop/github/time_series_labeling/datasets/example_data/test_classify_data\\metadata.json"
+    },
+    "saved_at": "2025-11-30T16:00:14.058050"
+  }
+}
