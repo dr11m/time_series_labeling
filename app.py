@@ -1,375 +1,334 @@
-import datetime
-import pandas as pd
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Cursor
-import warnings
-from src.settings_window import open_settings_window
-from src.controls_window import start_control_window
-import src.app_utils as app_utils
-from cfg.cfg_loader import cfg
-from src.data_formats import TimeSeriesDataset, TimeSeries, JSONAdapter, create_sample_dataset
+"""
+Time Series Labeling Application
+
+A universal tool for labeling time series with support for:
+- Prediction: Label future price values
+- Classification: Categorize time series into classes
+
+Uses pluggable similarity search methods.
+"""
+import sys
 import os
+import warnings
+import datetime
+from typing import Dict, Any
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-current_timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
+# Show all warnings and errors
+warnings.filterwarnings("default")
 
-class UniversalMainApp:
-    def __init__(self, dataset: TimeSeriesDataset):
-        self.dataset = dataset
-        self.idx = 0
-        self.click_stage = 1
-        self.first_click_y = None
-        self.fig = plt.gcf()
-        self.fig.canvas.mpl_connect('key_press_event', self.handle_key_press)
-        self.fig.canvas.mpl_connect('button_press_event', self.handle_mouse_click)
-        self.__post_init__()
+# Import settings and UI
+from src.settings.settings_window import open_settings_window
+from src.settings.settings_manager import SettingsManager
 
-    def __post_init__(self):
-        # Обрабатываем временные ряды согласно настройкам длины
-        self.process_series_lengths()
-        
-        # Находим первый неразмеченный ряд
-        while self.idx < len(self.dataset) and self.dataset.series[self.idx].is_labeled():
-            self.idx += 1
+# Import dataset loader
+from src.dataset_loader import NumpyDataset, load_numpy_dataset
 
-    def show_data(self):
-        if self.idx >= len(self.dataset):
-            print("Все ряды размечены!")
-            return
-            
-        series = self.dataset.series[self.idx]
-        values = series.get_values()
-        timestamps = series.get_timestamps()
-        
-        # Нормализуем для отображения если нужно
-        display_values = app_utils.normalize_array(values) if cfg.NORMALIZE_VIEW else values
-        
-        # Подготавливаем оси X в зависимости от настроек
-        if cfg.SHOW_TIMESTAMPS_AS_DATES and timestamps:
-            # Показываем timestamps как даты
-            try:
-                x_points = []
-                for ts in timestamps:
-                    if isinstance(ts, (int, float)):
-                        dt = datetime.datetime.fromtimestamp(ts)
-                    else:
-                        dt = pd.to_datetime(ts).to_pydatetime()
-                    x_points.append(dt)
-                x_label = "Date"
-            except:
-                # Если не удалось конвертировать, используем числа
-                x_points = list(range(1, len(values) + 1))
-                x_label = "Time Point"
-        else:
-            # Показываем как числа
-            x_points = list(range(1, len(values) + 1))
-            x_label = "Time Point"
+# Import labeling types
+from src.labeling_types.predict import PredictLabeling
+from src.labeling_types.classify import ClassifyLabeling
+from src.labeling_types.anomaly_detection import AnomalyDetectionLabeling
+from src.labeling_types.base import BaseLabelingType
 
-        plt.clf()
-        plt.plot(x_points, display_values, marker='o')
-        plt.scatter(x_points, display_values, color='green')
-        
-        # Отображаем размеченные значения если они есть
-        if series.labeled_values:
-            for label_name, label_value in series.labeled_values.items():
-                if cfg.NORMALIZE_VIEW:
-                    # Нормализуем размеченное значение для отображения
-                    display_label_value = app_utils.normalize_array([label_value])[0]
-                else:
-                    display_label_value = label_value
-                
-                # Рисуем горизонтальную линию для размеченного значения
-                plt.axhline(y=display_label_value, color='orange', linestyle='--', alpha=0.8, 
-                           label=f'Labeled {label_name}: {label_value:.3f}')
-            
-            # Добавляем легенду для размеченных значений
-            plt.legend()
-        
-        # Добавляем текущую дату если включено
-        if cfg.SHOW_CURRENT_DATE:
-            current_time = datetime.datetime.now()
-            if isinstance(x_points[0], datetime.datetime):
-                # Если показываем даты, добавляем текущую дату
-                plt.axvline(x=current_time, color='red', linestyle='--', alpha=0.7, label='Current Date')
-                if not series.labeled_values:  # Добавляем легенду только если нет размеченных значений
-                    plt.legend()
-        
-        if self.first_click_y is not None:
-            plt.axhline(y=self.first_click_y, color='orange', linestyle='--')
-
-        cursor = Cursor(plt.gca(), useblit=True, color='red', linewidth=1)
-        plt.xlabel(x_label)
-        plt.ylabel("Value")
-        
-        # Показываем информацию о ряде
-        title = cfg.TITLE_TEMPLATE.format(
-            idx=self.idx, 
-            name=series.name or series.id,
-            length=series.length()
-        )
-        plt.title(title)
-        plt.grid(True)
-        
-        # Автоматическое форматирование меток оси X для дат
-        if isinstance(x_points[0], datetime.datetime):
-            plt.gca().xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%Y-%m-%d'))
-            plt.gca().xaxis.set_major_locator(plt.matplotlib.dates.AutoDateLocator())
-        
-        plt.show()
-
-    def handle_key_press(self, event):
-        if event.key == "right":
-            self.go_forward()
-        elif event.key == "left":
-            self.go_backward()
-        elif event.key == "d":
-            self.find_and_plot_distances()
-        elif event.key == "f":
-            self.filter_by_length()
-
-    def handle_mouse_click(self, event):
-        x, y = event.xdata, event.ydata
-        if x is None or y is None:
-            return
-
-        series = self.dataset.series[self.idx]
-        values = series.get_values()
-        y_original = app_utils.denormalize_value(y, values) if cfg.NORMALIZE_VIEW else y
-
-        if cfg.NUM_PRICES.value == 1:
-            # Размечаем одну цену
-            if series.labeled_values is None:
-                series.labeled_values = {}
-            series.labeled_values['price_1'] = round(y_original, 3)
-            self.idx += 1
-        else:
-            # Размечаем две цены
-            if series.labeled_values is None:
-                series.labeled_values = {}
-                
-            if self.click_stage == 1:
-                series.labeled_values['price_1'] = round(y_original, 3)
-                self.first_click_y = y
-                self.click_stage = 2
-            else:
-                series.labeled_values['price_2'] = round(y_original, 3)
-                self.click_stage = 1
-                self.first_click_y = None
-                self.idx += 1
-
-        self.save_data()
-        self.show_data()
-
-    def save_data(self):
-        """Сохранить данные в JSON формате"""
-        
-        # Сохраняем в JSON
-        json_path = f"{cfg.OUTPUT_DIR}/universal_labeling_{current_timestamp}.json"
-        json_adapter = JSONAdapter()
-        json_adapter.save_data(self.dataset, json_path)
-        
-        print(f"Data saved to {json_path}")
-
-    def find_and_plot_distances(self):
-        """Найти похожие паттерны"""
-        if self.idx >= len(self.dataset):
-            return
-            
-        current_series = self.dataset.series[self.idx]
-        current_values = current_series.get_values()
-        
-        # Получаем размеченные ряды
-        labeled_series = self.dataset.get_labeled_series()
-        if len(labeled_series) < 2:
-            print("Недостаточно размеченных данных!")
-            return
-            
-        # Находим похожие ряды
-        similar_series = []
-        for labeled_ts in labeled_series:
-            labeled_values = labeled_ts.get_values()
-            distance = app_utils.calculate_dtw_distance(current_values, labeled_values)
-            similar_series.append((labeled_ts, distance))
-        
-        # Сортируем по расстоянию
-        similar_series.sort(key=lambda x: x[1])
-        similar_series = similar_series[:4]  # Берем 4 самых похожих
-        
-        # Показываем графики
-        fig = plt.figure(num="Similar Patterns", figsize=(12, 6))
-        fig.suptitle(f"Similar patterns for series {current_series.name}", fontsize=12)
-        axes = fig.subplots(2, 2)
-        
-        for i, (series, distance) in enumerate(similar_series):
-            ax = axes[i // 2, i % 2]
-            values = series.get_values()
-            timestamps = series.get_timestamps()
-            
-            # Подготавливаем оси X в зависимости от настроек
-            if cfg.SHOW_TIMESTAMPS_AS_DATES and timestamps:
-                try:
-                    x_points = []
-                    for ts in timestamps:
-                        if isinstance(ts, (int, float)):
-                            dt = datetime.datetime.fromtimestamp(ts)
-                        else:
-                            dt = pd.to_datetime(ts).to_pydatetime()
-                        x_points.append(dt)
-                except:
-                    x_points = list(range(1, len(values) + 1))
-            else:
-                x_points = list(range(1, len(values) + 1))
-            
-            if cfg.NORMALIZE_VIEW:
-                values_norm = app_utils.normalize_array(values)
-                ax.plot(x_points, values_norm)
-            else:
-                ax.plot(x_points, values)
-            
-            # Отображаем все размеченные значения
-            if series.labeled_values:
-                for label_name, label_value in series.labeled_values.items():
-                    if cfg.NORMALIZE_VIEW:
-                        display_label_value = app_utils.normalize_array([label_value])[0]
-                    else:
-                        display_label_value = label_value
-                    
-                    ax.axhline(y=display_label_value, color='blue', linestyle='--', alpha=0.8,
-                               label=f'{label_name}: {label_value:.3f}')
-                
-                # Добавляем легенду для размеченных значений
-                ax.legend(fontsize=8)
-            
-            # Добавляем текущую дату если включено
-            if cfg.SHOW_CURRENT_DATE and isinstance(x_points[0], datetime.datetime):
-                current_time = datetime.datetime.now()
-                ax.axvline(x=current_time, color='red', linestyle='--', alpha=0.7)
-                # Автоматическое форматирование меток оси X для дат
-                ax.xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%Y-%m-%d'))
-                ax.xaxis.set_major_locator(plt.matplotlib.dates.AutoDateLocator())
-                    
-            ax.set_title(f"Similar {i+1} (D: {distance:.2f})")
-            ax.grid(True)
-        
-        plt.tight_layout()
-        plt.show(block=False)
-
-    def filter_by_length(self):
-        """Фильтровать ряды по длине"""
-        print("\nФильтрация по длине:")
-        print("1. Минимальная длина")
-        print("2. Максимальная длина") 
-        print("3. Диапазон длин")
-        print("4. Применить настройки из конфига")
-        
-        try:
-            choice = input("Выберите опцию (1-4): ").strip()
-            
-            if choice == "1":
-                min_len = int(input("Введите минимальную длину: "))
-                self.dataset = self.dataset.filter_by_length(min_length=min_len)
-                print(f"Осталось рядов: {len(self.dataset)}")
-                
-            elif choice == "2":
-                max_len = int(input("Введите максимальную длину: "))
-                self.dataset = self.dataset.filter_by_length(max_length=max_len)
-                print(f"Осталось рядов: {len(self.dataset)}")
-                
-            elif choice == "3":
-                min_len = int(input("Введите минимальную длину: "))
-                max_len = int(input("Введите максимальную длину: "))
-                self.dataset = self.dataset.filter_by_length(min_length=min_len, max_length=max_len)
-                print(f"Осталось рядов: {len(self.dataset)}")
-                
-            elif choice == "4":
-                # Применяем настройки из конфига
-                self.process_series_lengths()
-                print(f"Применены настройки из конфига. Осталось рядов: {len(self.dataset)}")
-                
-            # Сбрасываем индекс
-            self.idx = 0
-            self.__post_init__()
-            
-        except (ValueError, KeyboardInterrupt):
-            print("Отменено")
-
-    def go_forward(self):
-        if self.idx < len(self.dataset) - 1:
-            self.idx += 1
-            self.click_stage = 1
-            self.show_data()
-            print("Moved forward.")
-
-    def process_series_lengths(self):
-        """Обработать временные ряды согласно настройкам длины"""
-        if not hasattr(cfg, 'TARGET_SERIES_LENGTH'):
-            return
-            
-        target_length = cfg.TARGET_SERIES_LENGTH
-        skip_shorter = getattr(cfg, 'SKIP_SHORTER_SERIES', True)
-        take_last_n = getattr(cfg, 'TAKE_LAST_N_VALUES', True)
-        
-        processed_series = []
-        skipped_count = 0
-        truncated_count = 0
-        
-        for series in self.dataset.series:
-            current_length = series.length()
-            
-            # Пропускаем короткие ряды
-            if skip_shorter and current_length < target_length:
-                skipped_count += 1
-                continue
-            
-            # Если ряд длиннее целевой длины, берем последние N значений
-            if take_last_n and current_length > target_length:
-                series.points = series.points[-target_length:]
-                truncated_count += 1
-            
-            processed_series.append(series)
-        
-        # Обновляем dataset
-        self.dataset.series = processed_series
-        
-        print(f"Обработка временных рядов завершена:")
-        print(f"  - Целевая длина: {target_length}")
-        print(f"  - Пропущено коротких рядов: {skipped_count}")
-        print(f"  - Обрезано длинных рядов: {truncated_count}")
-        print(f"  - Осталось рядов: {len(processed_series)}")
-
-    def go_backward(self):
-        if self.idx > 0:
-            self.idx -= 1
-            self.click_stage = 1
-            self.show_data()
-            print("Moved backward.")
+# Import similarity
+from src.similarity.soft_dtw import SoftDTWSimilarityFinder
+from src.similarity.base import BaseSimilarityFinder
 
 
-def load_data_from_source(source_path: str) -> TimeSeriesDataset:
-    """Загрузить данные из JSON файла"""
-    if not source_path.endswith('.json'):
-        raise ValueError(f"Only JSON format is supported: {source_path}")
+def create_similarity_finder(settings: Dict[str, Any]) -> BaseSimilarityFinder:
+    """
+    Create similarity finder based on settings.
     
-    adapter = JSONAdapter()
-    return adapter.load_data(source_path)
+    Args:
+        settings: Application settings dictionary
+    
+    Returns:
+        Similarity finder instance
+    """
+    similarity_settings = settings.get("similarity", {})
+    method = similarity_settings.get("method", "soft_dtw")
+    
+    if method == "soft_dtw":
+        return SoftDTWSimilarityFinder(similarity_settings)
+    else:
+        raise ValueError(f"Unknown similarity method: {method}")
+
+
+def load_dataset(settings: Dict[str, Any]) -> NumpyDataset:
+    """
+    Load dataset from file paths specified in settings.
+    
+    Args:
+        settings: Application settings dictionary
+    
+    Returns:
+        NumpyDataset instance
+    """
+    data_settings = settings.get("data", {})
+    prices_file = data_settings.get("prices_file", "")
+    timestamps_file = data_settings.get("timestamps_file", "")
+    ids_file = data_settings.get("ids_file", "")
+    cluster_ids_file = data_settings.get("cluster_ids_file", "")
+    labels_file = data_settings.get("labels_file", "")
+    metadata_file = data_settings.get("metadata_file", "")
+    predicted_prices_file = data_settings.get("predicted_prices_to_help_file", "")
+    
+    if not prices_file or not timestamps_file:
+        print(f"Error: Required files not specified in settings")
+        sys.exit(1)
+    
+    if not os.path.exists(prices_file):
+        print(f"Error: Prices file not found: {prices_file}")
+        sys.exit(1)
+    
+    if not os.path.exists(timestamps_file):
+        print(f"Error: Timestamps file not found: {timestamps_file}")
+        sys.exit(1)
+    
+    try:
+        dataset = load_numpy_dataset(
+            prices_file=prices_file,
+            timestamps_file=timestamps_file,
+            ids_file=ids_file if ids_file else None,
+            cluster_ids_file=cluster_ids_file if cluster_ids_file else None,
+            labels_file=labels_file if labels_file else None,
+            metadata_file=metadata_file if metadata_file else None,
+            predicted_prices_file=predicted_prices_file if predicted_prices_file else None
+        )
+        print(f"Loaded dataset from files")
+        print(f"  - Samples: {len(dataset)}")
+        print(f"  - Price shape: {dataset.prices.shape}")
+        
+        if dataset.labels is not None:
+            import numpy as np
+            if dataset.labels.ndim == 1:
+                labeled_count = np.sum(~np.isnan(dataset.labels))
+            else:
+                labeled_count = np.sum(~np.all(np.isnan(dataset.labels), axis=1))
+            print(f"  - Labeled: {labeled_count}/{len(dataset)}")
+        
+        return dataset
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def create_labeling_app(settings: Dict[str, Any], dataset: NumpyDataset, 
+                        similarity_finder: BaseSimilarityFinder) -> BaseLabelingType:
+    """
+    Create appropriate labeling application based on settings.
+    
+    Args:
+        settings: Application settings dictionary
+        dataset: TimeSeriesDataset instance
+        similarity_finder: Similarity finder instance
+    
+    Returns:
+        Labeling application instance
+    """
+    labeling_type = settings.get("labeling_type", "predict")
+    
+    if labeling_type == "predict":
+        print("Starting in PREDICT mode")
+        print(f"  - Labeling {settings['predict']['num_prices']} price(s)")
+        return PredictLabeling(dataset, settings, similarity_finder)
+    
+    elif labeling_type == "classify":
+        print("Starting in CLASSIFY mode")
+        print(f"  - Classifying into {settings['classify']['num_classes']} classes")
+        return ClassifyLabeling(dataset, settings, similarity_finder)
+    
+    elif labeling_type == "anomaly_detection":
+        print("Starting in ANOMALY DETECTION mode")
+        print("  - Marking anomaly points in time series")
+        return AnomalyDetectionLabeling(dataset, settings, similarity_finder)
+    
+    else:
+        raise ValueError(f"Unknown labeling type: {labeling_type}")
+
+
+def _save_settings_to_metadata(settings: Dict[str, Any], dataset: NumpyDataset) -> None:
+    """
+    Save all settings to metadata.json in the same folder as prices.npy.
+    
+    This allows the application to restore all configuration when loading the dataset again.
+    """
+    try:
+        prices_dir = os.path.dirname(dataset.prices_file)
+        metadata_path = os.path.join(prices_dir, "metadata.json")
+        
+        # Load existing metadata if it exists
+        existing_metadata = {}
+        if os.path.exists(metadata_path):
+            try:
+                import json
+                with open(metadata_path, 'r', encoding='utf-8') as f:
+                    existing_metadata = json.load(f)
+            except Exception as e:
+                print(f"Warning: Could not load existing metadata: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Update metadata with all settings
+        existing_metadata["labeling_settings"] = {
+            "labeling_type": settings.get("labeling_type"),
+            "predict": settings.get("predict", {}),
+            "classify": settings.get("classify", {}),
+            "anomaly_detection": settings.get("anomaly_detection", {}),
+            "labeling": settings.get("labeling", {}),
+            "similarity": settings.get("similarity", {}),
+            "data": {
+                "prices_file": settings.get("data", {}).get("prices_file", ""),
+                "timestamps_file": settings.get("data", {}).get("timestamps_file", ""),
+                "ids_file": settings.get("data", {}).get("ids_file", ""),
+                "cluster_ids_file": settings.get("data", {}).get("cluster_ids_file", ""),
+                "labels_file": settings.get("data", {}).get("labels_file", ""),
+                "metadata_file": settings.get("data", {}).get("metadata_file", "")
+            },
+            "saved_at": datetime.datetime.now().isoformat()
+        }
+        
+        # Save metadata
+        os.makedirs(prices_dir, exist_ok=True)
+        import json
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(existing_metadata, f, indent=2, ensure_ascii=False)
+        
+        print(f"Settings saved to {metadata_path}")
+        
+    except Exception as e:
+        print(f"Error saving settings to metadata: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+def print_settings_summary(settings: Dict[str, Any]) -> None:
+    """Print a summary of active settings."""
+    print("\n" + "="*60)
+    print("SETTINGS SUMMARY")
+    print("="*60)
+    
+    print(f"Labeling Type: {settings['labeling_type'].upper()}")
+    
+    # Similarity
+    similarity = settings.get('similarity', {})
+    print(f"Similarity Method: {similarity.get('method', 'soft_dtw')}")
+    print(f"Similar Series Count: {similarity.get('num_similar', 4)}")
+    
+    # Data
+    data = settings.get('data', {})
+    print(f"Prices file: {data.get('prices_file', 'N/A')}")
+    print(f"Timestamps file: {data.get('timestamps_file', 'N/A')}")
+    if data.get('ids_file'):
+        print(f"IDs file: {data.get('ids_file')}")
+    if data.get('cluster_ids_file'):
+        print(f"Cluster IDs file: {data.get('cluster_ids_file')}")
+    if data.get('labels_file'):
+        print(f"Labels file: {data.get('labels_file')}")
+    
+    print("="*60 + "\n")
+
+
+def main():
+    """Main application entry point."""
+    print("="*60)
+    print("TIME SERIES LABELING TOOL")
+    print("="*60)
+    print()
+    
+    # Open settings window
+    print("Opening settings window...")
+    settings = open_settings_window()
+    
+    if settings is None:
+        print("Settings window closed without saving. Exiting.")
+        return
+    
+    # Print settings summary
+    print_settings_summary(settings)
+    
+    # Load dataset from folder and prefix (after settings configured)
+    print("Loading dataset...")
+    dataset = load_dataset(settings)
+    
+    # Save all settings to metadata.json for future loading
+    _save_settings_to_metadata(settings, dataset)
+    
+    # Create similarity finder
+    print("Initializing similarity search...")
+    similarity_finder = create_similarity_finder(settings)
+    
+    # Create labeling application
+    print("Launching labeling interface...")
+    labeling_app = create_labeling_app(settings, dataset, similarity_finder)
+    
+    # Start labeling
+    print("\n" + "="*60)
+    print("LABELING STARTED")
+    print("="*60)
+    print()
+    
+    if settings['labeling_type'] == 'predict':
+        print("Controls:")
+        print("  - Click on plot to label prices")
+        print("  - D: Show similar series")
+        print("  - Arrow keys (←/→): Navigate")
+        print("  - Ctrl+S: Save progress")
+        print("  - Q: Quit")
+    elif settings['labeling_type'] == 'classify':
+        num_classes = settings['classify']['num_classes']
+        keys = ', '.join([str(i) for i in range(1, num_classes + 1)])
+        print("Controls:")
+        print(f"  - {keys}: Classify into class")
+        print("  - S: Show similar series")
+        print("  - Arrow keys (←/→): Navigate")
+        print("  - Q: Quit")
+    else:  # anomaly_detection
+        print("Controls:")
+        print("  - Click on plot to mark/unmark anomaly point")
+        print("  - D: Show similar series")
+        print("  - Arrow keys (←/→): Navigate")
+        print("  - Ctrl+S: Save progress")
+        print("  - Q: Quit")
+    
+    print()
+    
+    try:
+        labeling_app.start()
+        print("\nLabeling session completed!")
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user. Saving progress...")
+        try:
+            labeling_app.save_progress()
+            print("Progress saved.")
+        except Exception as e:
+            print(f"\nError saving progress: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+    except Exception as e:
+        print(f"\nError during labeling: {e}")
+        import traceback
+        traceback.print_exc()
+        print("\nAttempting to save progress...")
+        try:
+            labeling_app.save_progress()
+            print("Progress saved.")
+        except Exception as save_error:
+            print(f"Could not save progress: {save_error}")
+            import traceback
+            traceback.print_exc()
+        # Re-raise the original exception so program crashes
+        raise
 
 
 if __name__ == "__main__":
-    open_settings_window()
-
-    # Загружаем данные
-    if hasattr(cfg, 'DATA_FILE') and os.path.exists(cfg.DATA_FILE):
-        dataset = load_data_from_source(cfg.DATA_FILE)
-    else:
-        # Создаем демонстрационные данные
-        dataset = create_sample_dataset()
-
-    print(f"Loaded {len(dataset)} time series")
-    print(f"Unlabeled: {len(dataset.get_unlabeled_series())}")
-    print(f"Labeled: {len(dataset.get_labeled_series())}")
-
-    main_app = UniversalMainApp(dataset)
-    start_control_window(main_app)
-    main_app.show_data()
+    try:
+        main()
+    except Exception as e:
+        print(f"\nFatal error in main: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
